@@ -11,7 +11,7 @@ A Zephyr workspace application targeting Espressif ESP32 SoCs, based on the
 
 | Placeholder | Meaning |
 |---|---|
-| `<workspace>` | West workspace root (the directory containing `.west/`) |
+| `<workspace>` | West workspace root (the directory containing `.west/`); `esp32_app` in the examples below |
 | `<app-repo>` | This repository, cloned inside `<workspace>` |
 | `<board>` | Target board identifier, e.g. `esp32_devkitc/esp32/procpu` |
 | `<port>` | Serial port, e.g. `COM3` or `/dev/ttyUSB0` |
@@ -67,8 +67,8 @@ The path shown must be inside the workspace virtual environment.
 ### 1. Initialize the workspace
 
 ```shell
-west init -m <repository-url> --mr main <workspace>
-cd <workspace>
+west init -m https://github.com/zephyrproject-rtos/example-application --mr main esp32_app
+cd esp32_app
 west update
 ```
 
@@ -85,8 +85,9 @@ is otherwise broken.
 
 ### 2. Add the Espressif HAL to the manifest
 
-The example-application template imports Zephyr through a `name-allowlist` that
-omits Espressif. Edit `<app-repo>/west.yml`:
+The example-application template imports Zephyr through a `name-allowlist`
+containing HALs for other vendors and omitting Espressif. Replace that list with
+`hal_espressif` in `<app-repo>/west.yml`:
 
 ```yaml
     - name: zephyr
@@ -94,19 +95,15 @@ omits Espressif. Edit `<app-repo>/west.yml`:
       revision: main
       import:
         name-allowlist:
-          - cmsis_6
-          - hal_espressif      # add this
-          - hal_nordic
-          - hal_stm32
+          - hal_espressif
 ```
 
 Removing the `name-allowlist` block entirely imports Zephyr's full module set —
 a larger clone, but it avoids further missing-dependency errors.
 
-Confirm the change is visible to west, then update:
+Then update the workspace:
 
 ```shell
-west manifest --resolve | grep hal_espressif
 west update
 west list | grep hal
 ```
@@ -210,46 +207,6 @@ Run Twister tests:
 ```shell
 west twister -T tests --integration
 ```
-
----
-
-## Wi-Fi configuration
-
-Minimum `prj.conf` for the ESP32 Wi-Fi stack in station mode:
-
-```
-CONFIG_LOG=y
-CONFIG_CONSOLE=y
-CONFIG_SERIAL=y
-CONFIG_UART_CONSOLE=y
-
-CONFIG_WIFI=y
-CONFIG_WIFI_ESP32=y
-CONFIG_NETWORKING=y
-CONFIG_NET_L2_ETHERNET=y
-CONFIG_NET_IPV4=y
-CONFIG_NET_DHCPV4=y
-CONFIG_NET_MGMT=y
-CONFIG_NET_MGMT_EVENT=y
-CONFIG_NET_MGMT_EVENT_INFO=y
-
-CONFIG_HEAP_MEM_POOL_SIZE=98304
-CONFIG_MAIN_STACK_SIZE=4096
-CONFIG_NET_TX_STACK_SIZE=2048
-CONFIG_NET_RX_STACK_SIZE=2048
-```
-
-Notes:
-
-- The Espressif blobs allocate from the system heap during initialization. An
-  undersized `CONFIG_HEAP_MEM_POOL_SIZE` fails at **runtime**, not at build
-  time.
-- `NET_REQUEST_WIFI_CONNECT` returns immediately. Register a `net_mgmt` event
-  callback to determine whether the association actually succeeded.
-- Reference implementation: `zephyr/samples/net/wifi/`. The shell variant is
-  useful for testing credentials interactively before committing them.
-- Do not commit credentials. Use a git-ignored `prj.local.conf`, a settings
-  partition, or Kconfig values supplied at build time.
 
 ---
 
